@@ -344,6 +344,13 @@
             font-size: 16px;
         }
         
+        .input-hint {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 8px;
+            text-align: center;
+        }
+        
         /* Рулетка */
         .roulette-modal .modal-content {
             max-width: 500px;
@@ -569,6 +576,47 @@
             margin-top: 5px;
             text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
         }
+        
+        /* Модальное окно вывода */
+        .withdraw-modal .modal-content {
+            background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+            border: 2px solid #60a5fa;
+        }
+        
+        .withdraw-summary {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .withdraw-summary .amount {
+            font-size: 32px;
+            color: #ffd700;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .withdraw-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .btn-confirm {
+            background: linear-gradient(45deg, #10b981, #059669);
+            margin-top: 20px;
+        }
+        
+        .btn-confirm:disabled {
+            background: linear-gradient(45deg, #6b7280, #4b5563);
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -606,7 +654,7 @@
                 💰 Купить звёзды
             </button>
             
-            <button class="btn btn-withdraw" onclick="showContactInfo('withdraw')">
+            <button class="btn btn-withdraw" onclick="showWithdrawModal()">
                 💸 Вывести звёзды
             </button>
             
@@ -624,14 +672,6 @@
                 <p>Для покупки звёзд напишите:</p>
                 <p><a href="https://t.me/Z_Lyx" target="_blank">@Z_Lyx</a> (https://t.me/Z_Lyx)</p>
                 <p>Укажите количество звёзд и получите реквизиты для оплаты</p>
-            </div>
-            
-            <div id="contactWithdraw" class="contact-info" style="display: none;">
-                <h4 style="color: #3b82f6; margin-bottom: 10px;">💸 Вывод звёзд</h4>
-                <p>Для вывода звёзд напишите:</p>
-                <p><a href="https://t.me/Z_Lyx" target="_blank">@Z_Lyx</a> (https://t.me/Z_Lyx)</p>
-                <p>Минимум для вывода: 15 звёзд</p>
-                <p>Максимум: 100 звёзд</p>
             </div>
             
             <!-- Промокод панель -->
@@ -752,6 +792,45 @@
         </div>
     </div>
     
+    <!-- Модальное окно вывода -->
+    <div id="withdrawModal" class="modal withdraw-modal">
+        <div class="modal-content">
+            <h2 style="text-align: center; margin-bottom: 25px; color: #ffd700;">💸 Вывод звёзд</h2>
+            
+            <div class="input-group">
+                <label>Сколько звёзд хотите вывести?</label>
+                <input type="number" id="withdrawAmount" placeholder="15-100" min="15" max="100" step="1" value="15">
+                <div class="input-hint">Минимум: 15 ⭐ | Максимум: 100 ⭐</div>
+            </div>
+            
+            <div class="withdraw-summary">
+                <p>Вы запросили вывод:</p>
+                <div class="amount" id="withdrawPreview">15 ⭐</div>
+                <div class="withdraw-stats">
+                    <div>Доступно: <span id="availableBalance">0 ⭐</span></div>
+                    <div>Будет после вывода: <span id="afterWithdraw">0 ⭐</span></div>
+                </div>
+            </div>
+            
+            <div id="withdrawError" style="color: #ef4444; text-align: center; margin: 10px 0; display: none;">
+                ❌ Недостаточно звёзд для вывода!
+            </div>
+            
+            <div id="withdrawSuccess" style="color: #10b981; text-align: center; margin: 10px 0; display: none;">
+                ✅ Запрос на вывод отправлен!
+            </div>
+            
+            <div style="display: flex; gap: 15px; margin-top: 25px;">
+                <button class="btn btn-confirm" id="confirmWithdrawBtn" onclick="confirmWithdraw()" style="flex: 1;">
+                    💸 Подтвердить вывод
+                </button>
+                <button class="btn" onclick="hideWithdrawModal()" style="flex: 1; background: linear-gradient(45deg, #6b7280, #4b5563);">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Модальное окно рулетки -->
     <div id="rouletteModal" class="modal roulette-modal">
         <div class="modal-content">
@@ -847,6 +926,7 @@
             initTabs();
             initCaseButtons();
             initRoulette();
+            initWithdrawModal();
             
             if (savedBalance === null) {
                 setTimeout(() => {
@@ -903,6 +983,13 @@
             });
         }
         
+        function initWithdrawModal() {
+            const withdrawInput = document.getElementById('withdrawAmount');
+            if (withdrawInput) {
+                withdrawInput.addEventListener('input', updateWithdrawPreview);
+            }
+        }
+        
         // ===== ОБНОВЛЕНИЕ БАЛАНСА =====
         function updateBalance() {
             const balanceEl = document.getElementById('balance');
@@ -943,6 +1030,111 @@
             });
         }
         
+        // ===== ВЫВОД ЗВЁЗД =====
+        function showWithdrawModal() {
+            const modal = document.getElementById('withdrawModal');
+            const withdrawInput = document.getElementById('withdrawAmount');
+            const confirmBtn = document.getElementById('confirmWithdrawBtn');
+            
+            // Сбрасываем состояние
+            document.getElementById('withdrawError').style.display = 'none';
+            document.getElementById('withdrawSuccess').style.display = 'none';
+            
+            // Устанавливаем максимальное значение как текущий баланс, но не более 100
+            let maxWithdraw = Math.min(balance, 100);
+            if (maxWithdraw < 15) maxWithdraw = 15;
+            
+            withdrawInput.max = maxWithdraw;
+            withdrawInput.value = maxWithdraw < 15 ? 15 : maxWithdraw;
+            
+            updateWithdrawPreview();
+            
+            // Активируем или деактивируем кнопку
+            if (balance < 15) {
+                confirmBtn.disabled = true;
+                document.getElementById('withdrawError').style.display = 'block';
+            } else {
+                confirmBtn.disabled = false;
+            }
+            
+            modal.classList.add('active');
+        }
+        
+        function hideWithdrawModal() {
+            document.getElementById('withdrawModal').classList.remove('active');
+        }
+        
+        function updateWithdrawPreview() {
+            const withdrawAmount = parseInt(document.getElementById('withdrawAmount').value) || 15;
+            const availableBalance = document.getElementById('availableBalance');
+            const afterWithdraw = document.getElementById('afterWithdraw');
+            const withdrawPreview = document.getElementById('withdrawPreview');
+            const confirmBtn = document.getElementById('confirmWithdrawBtn');
+            
+            // Проверяем границы
+            if (withdrawAmount < 15) document.getElementById('withdrawAmount').value = 15;
+            if (withdrawAmount > 100) document.getElementById('withdrawAmount').value = 100;
+            
+            const finalAmount = Math.min(100, Math.max(15, withdrawAmount));
+            
+            // Обновляем предпросмотр
+            withdrawPreview.textContent = finalAmount + ' ⭐';
+            availableBalance.textContent = balance + ' ⭐';
+            afterWithdraw.textContent = (balance - finalAmount) + ' ⭐';
+            
+            // Проверяем возможность вывода
+            if (balance >= finalAmount && finalAmount >= 15 && finalAmount <= 100) {
+                confirmBtn.disabled = false;
+                document.getElementById('withdrawError').style.display = 'none';
+            } else {
+                confirmBtn.disabled = true;
+                document.getElementById('withdrawError').style.display = 'block';
+            }
+        }
+        
+        function confirmWithdraw() {
+            const withdrawAmount = parseInt(document.getElementById('withdrawAmount').value);
+            
+            if (withdrawAmount < 15 || withdrawAmount > 100) {
+                showNotification('❌ Сумма вывода должна быть от 15 до 100 звёзд!', 'error');
+                return;
+            }
+            
+            if (balance < withdrawAmount) {
+                showNotification('❌ Недостаточно звёзд для вывода!', 'error');
+                return;
+            }
+            
+            // Списываем звёзды
+            balance -= withdrawAmount;
+            updateBalance();
+            
+            // Показываем успех
+            document.getElementById('withdrawSuccess').style.display = 'block';
+            document.getElementById('confirmWithdrawBtn').disabled = true;
+            
+            // Сохраняем историю выводов
+            const withdrawals = JSON.parse(localStorage.getItem('withdrawals') || '[]');
+            withdrawals.push({
+                amount: withdrawAmount,
+                date: new Date().toISOString(),
+                balanceAfter: balance
+            });
+            localStorage.setItem('withdrawals', JSON.stringify(withdrawals));
+            
+            showNotification(
+                `✅ Запрос на вывод ${withdrawAmount} звёзд отправлен!\n` +
+                `📞 Свяжитесь с администратором @Z_Lyx для получения средств\n` +
+                `✨ Остаток на балансе: ${balance} ⭐`,
+                'success'
+            );
+            
+            // Автоматически закрываем через 3 секунды
+            setTimeout(() => {
+                hideWithdrawModal();
+            }, 3000);
+        }
+        
         // ===== КОНТАКТНАЯ ИНФОРМАЦИЯ =====
         function showContactInfo(type) {
             hideContactInfo();
@@ -950,14 +1142,11 @@
             
             if (type === 'pay') {
                 document.getElementById('contactPay').style.display = 'block';
-            } else if (type === 'withdraw') {
-                document.getElementById('contactWithdraw').style.display = 'block';
             }
         }
         
         function hideContactInfo() {
             document.getElementById('contactPay').style.display = 'none';
-            document.getElementById('contactWithdraw').style.display = 'none';
         }
         
         // ===== ОТКРЫТИЕ КЕЙСОВ С РУЛЕТКОЙ =====
@@ -1208,4 +1397,3 @@
     </script>
 </body>
 </html>
-```
